@@ -1,0 +1,324 @@
+@page "/events/{EventId:int}"
+@inject NavigationManager NavigationManager
+@inject EventService EventService
+@using EventEase.Models
+
+<PageTitle>Event Details</PageTitle>
+
+<div class="container mt-4">
+    @if (currentEvent != null)
+    {
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/events">Events</a></li>
+                <li class="breadcrumb-item active" aria-current="page">@currentEvent.Title</li>
+            </ol>
+        </nav>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">@currentEvent.Title</h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h5 class="text-muted mb-3">
+                            <i class="bi bi-calendar-event"></i> @currentEvent.FormattedDateLong
+                        </h5>
+                        <h6 class="mb-3">
+                            <i class="bi bi-geo-alt"></i> @currentEvent.Location
+                        </h6>
+                        <hr />
+                        <h4>About This Event</h4>
+                        <p class="lead">@currentEvent.Description</p>
+                        <p>@currentEvent.FullDescription</p>
+                        
+                        <hr />
+                        <h5>Event Details</h5>
+                        <ul class="list-unstyled">
+                            <li><strong>Duration:</strong> @currentEvent.Duration</li>
+                            <li><strong>Capacity:</strong> @currentEvent.Capacity people</li>
+                            <li><strong>Available Spots:</strong> @currentEvent.AvailableSpots</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title">Registration</h5>
+                                <p class="card-text">
+                                    @if (currentEvent.AvailableSpots > 0)
+                                    {
+                                        <span class="badge bg-success mb-2">Spots Available</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger mb-2">Sold Out</span>
+                                    }
+                                </p>
+                                <p class="h4 mb-3">@currentEvent.Price</p>
+                                @if (currentEvent.AvailableSpots > 0)
+                                {
+                                    <button class="btn btn-primary w-100" @onclick="NavigateToRegistration">
+                                        Register Now
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-secondary w-100" disabled>
+                                        Registration Closed
+                                    </button>
+                                }
+                                <button class="btn btn-outline-secondary w-100 mt-2" @onclick="NavigateToEventList">
+                                    Back to Events
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Tracker Section -->
+        <div class="card mt-4">
+            <div class="card-header bg-success text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0"><i class="bi bi-people"></i> Attendance Tracker</h3>
+                    <button class="btn btn-light btn-sm" @onclick="ToggleAttendanceView">
+                        @(showAttendanceTracker ? "Hide" : "Show") Details
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Attendance Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center bg-primary text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Registrations</h6>
+                                <h2 class="mb-0">@currentEvent.TotalRegistrations</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center bg-success text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Attended</h6>
+                                <h2 class="mb-0">@currentEvent.AttendanceCount</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center bg-warning text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Not Attended</h6>
+                                <h2 class="mb-0">@currentEvent.NotAttendedCount</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center bg-info text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Attendance Rate</h6>
+                                <h2 class="mb-0">@currentEvent.AttendanceRate%</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (showAttendanceTracker)
+                {
+                    <!-- Search and Filter -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" placeholder="Search attendees by name or email..." 
+                                   @bind="searchTerm" @bind:event="oninput" />
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" @bind="filterStatus">
+                                <option value="all">All Attendees</option>
+                                <option value="attended">Attended</option>
+                                <option value="not-attended">Not Attended</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100" @onclick="RefreshList">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Attendee List -->
+                    @if (FilteredAttendees.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Company</th>
+                                        <th>Registration Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var attendee in FilteredAttendees)
+                                    {
+                                        <tr class="@(attendee.HasAttended ? "table-success" : "")">
+                                            <td>
+                                                @if (attendee.HasAttended)
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle"></i> Attended
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">
+                                                        <i class="bi bi-clock"></i> Pending
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td><strong>@attendee.FullName</strong></td>
+                                            <td>@attendee.Email</td>
+                                            <td>@(string.IsNullOrEmpty(attendee.Phone) ? "-" : attendee.Phone)</td>
+                                            <td>@(string.IsNullOrEmpty(attendee.Company) ? "-" : attendee.Company)</td>
+                                            <td>@attendee.RegistrationDate.ToString("MMM dd, yyyy")</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    @if (!attendee.HasAttended)
+                                                    {
+                                                        <button class="btn btn-success" 
+                                                                @onclick="() => MarkAttendance(attendee.Id, true)"
+                                                                title="Mark as attended">
+                                                            <i class="bi bi-check"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-warning" 
+                                                                @onclick="() => MarkAttendance(attendee.Id, false)"
+                                                                title="Mark as not attended">
+                                                            <i class="bi bi-x"></i>
+                                                        </button>
+                                                    }
+                                                    <button class="btn btn-danger" 
+                                                            @onclick="() => RemoveAttendee(attendee.Id)"
+                                                            title="Remove registration">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            @if (currentEvent.TotalRegistrations == 0)
+                            {
+                                <span>No registrations yet for this event.</span>
+                            }
+                            else
+                            {
+                                <span>No attendees match your search criteria.</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            <h4>Event Not Found</h4>
+            <p>The event you're looking for doesn't exist.</p>
+            <a href="/events" class="btn btn-primary">Return to Event List</a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int EventId { get; set; }
+
+    private EventItem? currentEvent;
+    private bool showAttendanceTracker = true;
+    private string searchTerm = string.Empty;
+    private string filterStatus = "all";
+
+    private IEnumerable<Attendee> FilteredAttendees
+    {
+        get
+        {
+            if (currentEvent == null) return Enumerable.Empty<Attendee>();
+
+            var attendees = currentEvent.Attendees.AsEnumerable();
+
+            // Apply search filter
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var search = searchTerm.ToLower();
+                attendees = attendees.Where(a => 
+                    a.FullName.ToLower().Contains(search) || 
+                    a.Email.ToLower().Contains(search) ||
+                    (a.Company?.ToLower().Contains(search) ?? false));
+            }
+
+            // Apply status filter
+            attendees = filterStatus switch
+            {
+                "attended" => attendees.Where(a => a.HasAttended),
+                "not-attended" => attendees.Where(a => !a.HasAttended),
+                _ => attendees
+            };
+
+            return attendees.OrderBy(a => a.LastName).ThenBy(a => a.FirstName);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        currentEvent = EventService.GetEventById(EventId);
+    }
+
+    private void NavigateToRegistration()
+    {
+        NavigationManager.NavigateTo($"/events/{EventId}/register");
+    }
+
+    private void NavigateToEventList()
+    {
+        NavigationManager.NavigateTo("/events");
+    }
+
+    private void ToggleAttendanceView()
+    {
+        showAttendanceTracker = !showAttendanceTracker;
+    }
+
+    private void MarkAttendance(int attendeeId, bool hasAttended)
+    {
+        EventService.MarkAttendance(EventId, attendeeId, hasAttended);
+        currentEvent = EventService.GetEventById(EventId); // Refresh to update statistics
+    }
+
+    private void RemoveAttendee(int attendeeId)
+    {
+        EventService.RemoveAttendee(EventId, attendeeId);
+        currentEvent = EventService.GetEventById(EventId); // Refresh
+    }
+
+    private void RefreshList()
+    {
+        currentEvent = EventService.GetEventById(EventId);
+        StateHasChanged();
+    }
+}

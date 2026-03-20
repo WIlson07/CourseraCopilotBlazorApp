@@ -1,0 +1,342 @@
+@page "/session-dashboard"
+@inject SessionService SessionService
+@inject NavigationManager NavigationManager
+@using EventEase.Models
+@using System.Linq
+
+<PageTitle>Session Dashboard</PageTitle>
+
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/events">Events</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Session Dashboard</li>
+        </ol>
+    </nav>
+
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="bi bi-activity"></i> Session Dashboard</h2>
+                <div class="btn-group">
+                    <button class="btn btn-outline-primary" @onclick="RefreshData">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                    <button class="btn btn-outline-danger" @onclick="ResetSession">
+                        <i class="bi bi-trash"></i> Reset Session
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-clock-history"></i> Session Duration
+                    </h6>
+                    <h3 class="mb-0">@FormatDuration(session.SessionDuration)</h3>
+                    <small>Started: @session.SessionStart.ToString("hh:mm tt")</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-eye"></i> Total Page Views
+                    </h6>
+                    <h3 class="mb-0">@session.TotalPageViews</h3>
+                    <small>@session.UniquePageViews unique pages</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-stopwatch"></i> Avg. Time/Page
+                    </h6>
+                    <h3 class="mb-0">@Math.Round(session.AverageTimePerPage, 1)s</h3>
+                    <small>Per page view</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-star"></i> Most Visited
+                    </h6>
+                    <h3 class="mb-0" style="font-size: 1.2rem;">
+                        @(session.MostVisitedPage?.PageTitle ?? "N/A")
+                    </h3>
+                    <small>@GetPageViewCount(session.MostVisitedPage?.PageUrl) views</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Page -->
+    @if (session.CurrentPage != null)
+    {
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-compass"></i> Current Page</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>@session.CurrentPage.PageTitle</h6>
+                        <p class="text-muted mb-0">@session.CurrentPage.PageUrl</p>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted">Started at</small>
+                        <p class="mb-0">@session.CurrentPage.ViewStart.ToString("hh:mm:ss tt")</p>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted">Time on page</small>
+                        <p class="mb-0"><strong>@session.CurrentPage.TimeSpentFormatted</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Page View Statistics -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Page View Statistics</h5>
+                </div>
+                <div class="card-body">
+                    @if (pageStats.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var stat in pageStats.OrderByDescending(s => s.Value).Take(10))
+                            {
+                                var percentage = (double)stat.Value / session.TotalPageViews * 100;
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <strong>@stat.Key</strong>
+                                        <span class="badge bg-primary">@stat.Value views</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: @percentage%" 
+                                             aria-valuenow="@percentage" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No page views recorded yet.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Page Views</h5>
+                </div>
+                <div class="card-body">
+                    @if (recentViews.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var view in recentViews)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>@view.PageTitle</strong>
+                                            <p class="text-muted mb-1" style="font-size: 0.875rem;">@view.PageUrl</p>
+                                            <small class="text-muted">@view.ViewStart.ToString("hh:mm:ss tt")</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-info">@view.TimeSpentFormatted</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No page views recorded yet.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Details -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Session Details</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <th>Session ID:</th>
+                                <td><code>@session.SessionId</code></td>
+                            </tr>
+                            <tr>
+                                <th>Session Start:</th>
+                                <td>@session.SessionStart.ToString("MMMM dd, yyyy hh:mm:ss tt")</td>
+                            </tr>
+                            <tr>
+                                <th>Session Status:</th>
+                                <td>
+                                    @if (session.SessionEnd.HasValue)
+                                    {
+                                        <span class="badge bg-danger">Ended</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <th>Total Page Views:</th>
+                                <td>@session.TotalPageViews</td>
+                            </tr>
+                            <tr>
+                                <th>Unique Pages:</th>
+                                <td>@session.UniquePageViews</td>
+                            </tr>
+                            <tr>
+                                <th>Session Duration:</th>
+                                <td>@FormatDuration(session.SessionDuration)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Timeline -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-map"></i> Navigation Timeline</h5>
+        </div>
+        <div class="card-body">
+            @if (session.PageViews.Any())
+            {
+                <div class="timeline">
+                    @foreach (var (view, index) in session.PageViews.Select((v, i) => (v, i)))
+                    {
+                        <div class="timeline-item">
+                            <div class="timeline-marker">@(index + 1)</div>
+                            <div class="timeline-content">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>@view.PageTitle</strong>
+                                        <p class="text-muted mb-0" style="font-size: 0.875rem;">@view.PageUrl</p>
+                                    </div>
+                                    <div class="text-end">
+                                        <small class="text-muted">@view.ViewStart.ToString("hh:mm:ss tt")</small>
+                                        <br />
+                                        <span class="badge bg-secondary">@view.TimeSpentFormatted</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No navigation history yet.</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserSession session = new();
+    private Dictionary<string, int> pageStats = new();
+    private List<PageView> recentViews = new();
+    private Timer? _refreshTimer;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+        
+        // Refresh every second
+        _refreshTimer = new Timer(RefreshCallback, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        
+        // Subscribe to session updates
+        SessionService.OnSessionUpdated += LoadData;
+    }
+
+    private void LoadData()
+    {
+        session = SessionService.CurrentSession;
+        pageStats = SessionService.GetPageViewStatistics();
+        recentViews = SessionService.GetRecentPageViews(10);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshCallback(object? state)
+    {
+        InvokeAsync(() =>
+        {
+            LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshData()
+    {
+        LoadData();
+    }
+
+    private async Task ResetSession()
+    {
+        await SessionService.ResetSessionAsync();
+        LoadData();
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalMinutes < 1)
+            return $"{duration.Seconds} seconds";
+        else if (duration.TotalHours < 1)
+            return $"{duration.Minutes} minutes, {duration.Seconds} seconds";
+        else
+            return $"{duration.Hours} hours, {duration.Minutes} minutes";
+    }
+
+    private int GetPageViewCount(string? pageUrl)
+    {
+        if (string.IsNullOrEmpty(pageUrl)) return 0;
+        return session.PageViews.Count(pv => pv.PageUrl == pageUrl);
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+        SessionService.OnSessionUpdated -= LoadData;
+    }
+}

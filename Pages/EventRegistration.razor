@@ -1,0 +1,196 @@
+@page "/events/{EventId:int}/register"
+@inject NavigationManager NavigationManager
+@inject EventService EventService
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Event Registration</PageTitle>
+
+<div class="container mt-4">
+    @if (currentEvent != null)
+    {
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/events">Events</a></li>
+                <li class="breadcrumb-item"><a href="/events/@EventId">@currentEvent.Title</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Registration</li>
+            </ol>
+        </nav>
+
+        @if (!registrationComplete)
+        {
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Register for @currentEvent.Title</h3>
+                        </div>
+                        <div class="card-body">
+                            <EditForm Model="@registrationModel" OnValidSubmit="HandleRegistration">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
+
+                                <div class="mb-3">
+                                    <label for="firstName" class="form-label">First Name *</label>
+                                    <InputText id="firstName" class="form-control" @bind-Value="registrationModel.FirstName" />
+                                    <ValidationMessage For="@(() => registrationModel.FirstName)" class="text-danger" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="lastName" class="form-label">Last Name *</label>
+                                    <InputText id="lastName" class="form-control" @bind-Value="registrationModel.LastName" />
+                                    <ValidationMessage For="@(() => registrationModel.LastName)" class="text-danger" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email Address *</label>
+                                    <InputText id="email" type="email" class="form-control" @bind-Value="registrationModel.Email" />
+                                    <ValidationMessage For="@(() => registrationModel.Email)" class="text-danger" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <InputText id="phone" type="tel" class="form-control" @bind-Value="registrationModel.Phone" />
+                                    <ValidationMessage For="@(() => registrationModel.Phone)" class="text-danger" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="company" class="form-label">Company/Organization</label>
+                                    <InputText id="company" class="form-control" @bind-Value="registrationModel.Company" />
+                                    <ValidationMessage For="@(() => registrationModel.Company)" class="text-danger" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="specialRequirements" class="form-label">Special Requirements or Dietary Restrictions</label>
+                                    <InputTextArea id="specialRequirements" class="form-control" rows="3" @bind-Value="registrationModel.SpecialRequirements" />
+                                    <ValidationMessage For="@(() => registrationModel.SpecialRequirements)" class="text-danger" />
+                                </div>
+
+                                <div class="mb-3 form-check">
+                                    <InputCheckbox id="termsAccepted" class="form-check-input" @bind-Value="registrationModel.TermsAccepted" />
+                                    <label class="form-check-label" for="termsAccepted">
+                                        I agree to the terms and conditions *
+                                    </label>
+                                    <ValidationMessage For="@(() => registrationModel.TermsAccepted)" class="text-danger d-block" />
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        Complete Registration
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="NavigateToEventDetails">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </EditForm>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-header">
+                            <h5 class="mb-0">Event Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-title">@currentEvent.Title</h6>
+                            <p class="card-text">
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar-event"></i> @currentEvent.FormattedDate<br/>
+                                    <i class="bi bi-geo-alt"></i> @currentEvent.Location<br/>
+                                    <i class="bi bi-clock"></i> @currentEvent.Duration
+                                </small>
+                            </p>
+                            <hr />
+                            <div class="d-flex justify-content-between">
+                                <strong>Price:</strong>
+                                <span class="h5 mb-0">@currentEvent.Price</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+                    <h2 class="mt-3">Registration Successful!</h2>
+                    <p class="lead">Thank you for registering for <strong>@currentEvent.Title</strong></p>
+                    <p>A confirmation email has been sent to <strong>@registrationModel.Email</strong></p>
+                    <hr />
+                    <div class="d-flex gap-2 justify-content-center">
+                        <a href="/events/@EventId" class="btn btn-primary">View Event Details</a>
+                        <a href="/events" class="btn btn-outline-primary">Browse More Events</a>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            <h4>Event Not Found</h4>
+            <p>The event you're trying to register for doesn't exist.</p>
+            <a href="/events" class="btn btn-primary">Return to Event List</a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int EventId { get; set; }
+
+    private EventItem? currentEvent;
+    private RegistrationModel registrationModel = new();
+    private bool registrationComplete = false;
+
+    protected override void OnInitialized()
+    {
+        currentEvent = EventService.GetEventById(EventId);
+    }
+
+    private void HandleRegistration()
+    {
+        if (currentEvent != null)
+        {
+            EventService.RegisterForEvent(EventId, registrationModel.FirstName, 
+                registrationModel.LastName, registrationModel.Email, 
+                registrationModel.Phone, registrationModel.Company);
+        }
+        registrationComplete = true;
+    }
+
+    private void NavigateToEventDetails()
+    {
+        NavigationManager.NavigateTo($"/events/{EventId}");
+    }
+
+    private class RegistrationModel
+    {
+        [Required(ErrorMessage = "First name is required")]
+        [StringLength(50, MinimumLength = 2, ErrorMessage = "First name must be between 2 and 50 characters")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Last name is required")]
+        [StringLength(50, MinimumLength = 2, ErrorMessage = "Last name must be between 2 and 50 characters")]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email address is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        [StringLength(100, ErrorMessage = "Email cannot exceed 100 characters")]
+        public string Email { get; set; } = string.Empty;
+
+        [Phone(ErrorMessage = "Invalid phone number format")]
+        [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
+        public string Phone { get; set; } = string.Empty;
+
+        [StringLength(100, ErrorMessage = "Company name cannot exceed 100 characters")]
+        public string Company { get; set; } = string.Empty;
+
+        [StringLength(500, ErrorMessage = "Special requirements cannot exceed 500 characters")]
+        public string SpecialRequirements { get; set; } = string.Empty;
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "You must accept the terms and conditions")]
+        public bool TermsAccepted { get; set; }
+    }
+}

@@ -1,0 +1,59 @@
+@inject SessionService SessionService
+@implements IDisposable
+
+<div class="session-info">
+    <div class="session-pill">
+        <i class="bi bi-activity"></i>
+        <span class="session-label">Session:</span>
+        <span class="session-time">@FormatDuration(SessionService.CurrentSession.SessionDuration)</span>
+        <span class="session-divider">|</span>
+        <span class="session-pages">
+            <i class="bi bi-eye"></i> @SessionService.CurrentSession.TotalPageViews
+        </span>
+        <button class="btn btn-sm btn-link session-details-btn" @onclick="NavigateToSessionDashboard" title="View session details">
+            <i class="bi bi-graph-up"></i>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private NavigationManager? NavigationManager { get; set; }
+    
+    private Timer? _refreshTimer;
+    
+    protected override void OnInitialized()
+    {
+        // Refresh every second to update duration
+        _refreshTimer = new Timer(RefreshCallback, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        
+        // Subscribe to session updates
+        SessionService.OnSessionUpdated += StateHasChanged;
+    }
+    
+    private void RefreshCallback(object? state)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+    
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalMinutes < 1)
+            return $"{duration.Seconds}s";
+        else if (duration.TotalHours < 1)
+            return $"{duration.Minutes}m {duration.Seconds}s";
+        else
+            return $"{duration.Hours}h {duration.Minutes}m";
+    }
+    
+    private void NavigateToSessionDashboard()
+    {
+        NavigationManager?.NavigateTo("/session-dashboard");
+    }
+    
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+        SessionService.OnSessionUpdated -= StateHasChanged;
+    }
+}

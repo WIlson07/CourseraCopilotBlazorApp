@@ -1,0 +1,29 @@
+<div class="event-card">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">@Event.Title</h5>
+            <h6 class="card-subtitle mb-2 text-muted">@Event.FormattedDate</h6>
+            <p class="card-text">@Event.Description</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="badge bg-primary">@Event.Location</span>
+                @if (OnViewDetails.HasDelegate)
+                {
+                    <button class="btn btn-sm btn-outline-primary" @onclick="HandleViewDetails">View Details</button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public EventItem Event { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<int> OnViewDetails { get; set; }
+
+    private async Task HandleViewDetails()
+    {
+        await OnViewDetails.InvokeAsync(Event.Id);
+    }
+}

@@ -1,0 +1,50 @@
+@inject SessionService SessionService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await SessionService.InitializeSessionAsync();
+        
+        // Track initial page
+        await TrackCurrentPage();
+        
+        // Subscribe to navigation changes
+        NavigationManager.LocationChanged += OnLocationChanged;
+        
+        // Subscribe to session updates
+        SessionService.OnSessionUpdated += StateHasChanged;
+    }
+    
+    private async void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        await TrackCurrentPage();
+    }
+    
+    private async Task TrackCurrentPage()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var pageUrl = uri.PathAndQuery;
+        var pageTitle = GetPageTitle(pageUrl);
+        
+        await SessionService.TrackPageViewAsync(pageUrl, pageTitle);
+    }
+    
+    private string GetPageTitle(string url)
+    {
+        // Extract page title from URL
+        if (url == "/" || url.StartsWith("/?")) return "Events";
+        if (url.StartsWith("/events/") && url.Contains("/register")) return "Event Registration";
+        if (url.StartsWith("/events/") && char.IsDigit(url.Split('/').Last().FirstOrDefault())) return "Event Details";
+        if (url.StartsWith("/events")) return "Events";
+        if (url.StartsWith("/session-dashboard")) return "Session Dashboard";
+        return "Unknown Page";
+    }
+    
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        SessionService.OnSessionUpdated -= StateHasChanged;
+    }
+}
